@@ -16,6 +16,8 @@ class UpdatePostRequest extends FormRequest
         return [
             'title' => 'sometimes|string|max:255',
             'content' => 'sometimes|string',
+            "category_ids" => "sometimes|array",
+            "tag_ids" => "sometimes|array"
         ];
     }
 }

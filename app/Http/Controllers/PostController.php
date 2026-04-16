@@ -7,62 +7,63 @@ use Illuminate\Http\Request;
 use App\Models\Post;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\UpdatePostRequest;
+use Illuminate\Support\Str;
 
 class PostController extends Controller
 {
     // Create a new post
     function store(StorePostRequest $request)
-    {
-        $user = $request->user();
+{
+    $user = $request->user();
+    $validated = $request->validated();
 
-        $validated = $request->validated();
+    $post = Post::create([
+        "title" => $validated['title'],
+        "content" => $validated['content'],
+        "slug" => Str::slug($validated['title']), 
+        "user_id" => $user->id
+    ]);
 
-        $post = Post::create([
-            "title" => $validated['title'],
-            "content" => $validated['content'],
-            "user_id" => $user->id
-        ]);
+    
+    $post->categories()->sync($validated['category_ids']);
+    $post->tags()->sync($validated['tag_ids']);
 
-        return response()->json([
-            'message' => 'Post created successfully',
-            'post' => $post
-        ], 201);
-    }
+    return response()->json([
+        'post' => $post->load(['user', 'categories', 'tags'])
+    ], 201);
+}
 
     // Get all posts
-    public function index()
-    {
-        $posts = Post::with('user')
-            ->latest()
-            ->paginate(5);
+  public function index(Request $request)
+{
+    $posts = Post::query()
+        ->with(['user', 'categories', 'tags'])
+        ->latest()
+        ->when($request->category, fn($q) =>
+            $q->inCategory($request->category)
+        )
+        ->when($request->tag, fn($q) =>
+            $q->withTag($request->tag)
+        )
+        ->paginate(5);
 
-        return response()->json([
-            'message' => 'Posts retrieved successfully',
-            'data' => $posts
-        ]);
-    }
+    return response()->json($posts);
+}
 
-    // Get a single post by ID
-    public function show($id)
-    {
-        $post = Post::with('user')->find($id);
+    //
+   public function show($slug)
+{
+    $post = Post::with(['user', 'categories', 'tags'])
+        ->where('slug', $slug)
+        ->firstOrFail();
 
-        if (!$post) {
-            return response()->json([
-                'message' => 'Post not found'
-            ], 404);
-        }
-
-        return response()->json([
-            'message' => 'Post retrieved successfully',
-            'data' => $post
-        ]);
-    }
+    return response()->json($post);
+}
 
     // Update an existing post
-    public function update(UpdatePostRequest $request, $id)
+    public function update(UpdatePostRequest $request, $slug)
     {
-        $post = Post::findOrFail($id);
+        $post = Post::where('slug', $slug)->firstOrFail();
         $user = $request->user();
 
         if ($post->user_id !== $user->id) {
@@ -71,20 +72,17 @@ class PostController extends Controller
             ], 403);
         }
 
-        $validated = $request->validated();
-
-        $post->update($validated);
-
-        return response()->json([
-            'message' => 'Post updated successfully',
-            'post' => $post
-        ]);
+         $post->update($request->validated());
+         
+         $post->categories()->sync($request->category_ids);
+         $post->tags()->sync($request->tag_ids);
+        return response()->json($post);
     }
 
     // Delete a post
-    public function destroy(Request $request,$id)
+    public function destroy(Request $request,$slug)
     {
-        $post = Post::findOrFail($id);
+        $post=Post::where('slug',$slug)->firstOrFail();
         $user = $request->user();
 
         if ($post->user_id !== $user->id) {

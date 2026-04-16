@@ -15,7 +15,9 @@ class StorePostRequest extends FormRequest
     {
         return [
             "title" => "required|string|max:255",
-            "content" => "required|string"
+            "content" => "required|string",
+            "category_ids" => "required|array",
+            "tag_ids" => "required|array"
         ];
     }
 }
