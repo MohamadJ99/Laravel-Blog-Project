@@ -8,6 +8,8 @@ use App\Models\Post;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\UpdatePostRequest;
 use Illuminate\Support\Str;
+use App\Events\PostPublished;
+use Carbon\Carbon;
 
 class PostController extends Controller
 {
@@ -97,4 +99,17 @@ class PostController extends Controller
             'message' => 'Post deleted successfully'
         ]);
     }
+
+    public function publish(Request $request, $slug)
+{
+    $post=Post::Where('slug',$slug)->firstOrFail();
+    if($post->user_id !==$request->user()->id)
+        {
+            return response()->json(['message'=>'Unauthorized'],403);
+
+        }
+
+        PostPublished::dispatch($post);
+        return  response()->json(['message'=>'Post published successfully']);
+}
 }
