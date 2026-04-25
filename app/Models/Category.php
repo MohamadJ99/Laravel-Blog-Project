@@ -12,4 +12,9 @@ class Category extends Model
     {
         return $this->belongsToMany(Post::class);
     }
+
+    public function auditLogs()
+{
+    return $this->morphMany(AuditLog::class, 'auditable');
+}
 }
