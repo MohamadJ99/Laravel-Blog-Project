@@ -11,11 +11,25 @@ use Illuminate\Support\Str;
 use App\Events\PostPublished;
 use App\Models\PostRevision;
 use App\Models\AuditLog;
+use App\Models\Category;
+use App\Models\Tag;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 
 class PostController extends Controller
 {
+    use AuthorizesRequests;
     // Create a new post
+
+    public function create()
+    {
+        $categories = Category::all();
+        $tags = Tag::all();
+
+        return view('posts.create', compact('categories', 'tags'));
+    }
+
+
     function store(StorePostRequest $request)
     {
         $user = $request->user();
@@ -41,9 +55,13 @@ class PostController extends Controller
         $post->categories()->sync($validated['category_ids']);
         $post->tags()->sync($validated['tag_ids']);
 
-        return response()->json([
-            'post' => $post->load(['user', 'categories', 'tags'])
-        ], 201);
+        // return response()->json([
+        //     'post' => $post->load(['user', 'categories', 'tags'])
+        // ], 201); API
+
+        return redirect()
+            ->route('posts.index')
+            ->with('success', 'Post created successfully');
     }
 
     // Get all posts
@@ -64,7 +82,9 @@ class PostController extends Controller
             )
             ->paginate(5);
 
-        return response()->json($posts);
+        // return response()->json($posts); API
+
+        return view('posts.index', compact('posts'));
     }
 
     //
@@ -74,8 +94,28 @@ class PostController extends Controller
             ->where('slug', $slug)
             ->firstOrFail();
 
-        return response()->json($post);
+        // return response()->json($post); API
+
+        return view('posts.show', compact('post'));
     }
+
+
+
+    public function edit(UpdatePostRequest $request, $slug)
+    {
+        $post = Post::with(['categories', 'tags'])
+            ->where('slug', $slug)
+            ->firstOrFail();
+
+        $this->authorize('update', $post);
+
+        $categories = Category::all();
+        $tags = Tag::all();
+
+        return view('posts.edit', compact('post', 'categories', 'tags'));
+    }
+
+
 
     // Update an existing post
     public function update(UpdatePostRequest $request, $slug)
@@ -83,11 +123,7 @@ class PostController extends Controller
         $post = Post::where('slug', $slug)->firstOrFail();
         $user = $request->user();
 
-        if ($post->user_id !== $user->id) {
-            return response()->json([
-                'message' => 'Unauthorized'
-            ], 403);
-        }
+        $this->authorize('update', $post);
 
         PostRevision::create([
             'post_id' => $post->id,
@@ -109,7 +145,11 @@ class PostController extends Controller
 
         $post->categories()->sync($request->category_ids);
         $post->tags()->sync($request->tag_ids);
-        return response()->json($post);
+        //return response()->json($post); API
+
+        return redirect()
+            ->route('posts.index')
+            ->with('success', 'Post updated successfully');
     }
 
     // Delete a post
@@ -118,11 +158,7 @@ class PostController extends Controller
         $post = Post::where('slug', $slug)->firstOrFail();
         $user = $request->user();
 
-        if ($post->user_id !== $user->id) {
-            return response()->json([
-                'message' => 'Unauthorized'
-            ], 403);
-        }
+        $this->authorize('delete', $post);
 
         AuditLog::create([
             'auditable_id' => $post->id,
@@ -134,19 +170,25 @@ class PostController extends Controller
 
         $post->delete();
 
-        return response()->json([
-            'message' => 'Post deleted successfully'
-        ]);
+        // return response()->json([
+        //     'message' => 'Post deleted successfully'
+        // ]); API
+
+        return redirect()
+            ->route('posts.index')
+            ->with('success', 'Post deleted successfully');
     }
 
     public function publish(Request $request, $slug)
     {
         $post = Post::Where('slug', $slug)->firstOrFail();
-        if ($post->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        
+        $this->authorize('publish', $post);
 
         PostPublished::dispatch($post);
-        return  response()->json(['message' => 'Post published successfully']);
+        // return  response()->json(['message' => 'Post published successfully']); API
+        return redirect()
+        ->route('posts.index')
+        ->with('success', 'Post published successfully');
     }
 }
