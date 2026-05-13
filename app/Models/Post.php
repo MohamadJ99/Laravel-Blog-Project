@@ -52,6 +52,11 @@ public function scopeWithTag($query, string $slug)
     });
 }
 
+public function auditLogs()
+{
+    return $this->morphMany(AuditLog::class, 'auditable');
+}
+
 
 }
 
